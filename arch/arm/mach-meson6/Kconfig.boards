@@ -20,7 +20,7 @@ config MACH_MESON6_G18
 	help
           Support for Amlogic Meson6 g18 platform.
 
-config MACH_MESON6_G18_TH
+config MACH_MESON6_G18_TH2
         depends on ARCH_MESON6
         bool "Meson6 g18_th board"
         help
