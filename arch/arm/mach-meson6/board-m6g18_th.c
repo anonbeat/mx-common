@@ -570,37 +570,37 @@ static struct platform_device aml_uart_device = {
 static struct mtd_partition normal_partition_info[] = {
     {
         .name = "logo",
-        .offset = 12*1024*1024,
+        .offset = 32*1024*1024,
         .size = 8*1024,
     },
     {
         .name = "aml_logo",
-        .offset = (12+8)*1024*1024,
+        .offset = (32+8)*1024*1024,
         .size = 8*1024,
     },
     {
         .name = "recovery",
-        .offset = (12+8+8)*1024*1024,
+        .offset = (32+8+8)*1024*1024,
         .size = 8*1024,
     },
     {
         .name = "boot",
-        .offset = (12+8+8+8)*1024*1024,
+        .offset = (32+8+8+8)*1024*1024,
         .size = 8*1024,
     },
     {
         .name = "system",
-        .offset = (12+8+8+8+8)*1024*1024,
+        .offset = (32+8+8+8+8)*1024*1024,
         .size = 1026*1024,
     },
     {
         .name = "cache",
-        .offset = (12+8+8+8+8+1026)*1024*1024,
+        .offset = (32+8+8+8+8+1026)*1024*1024,
         .size = 512*1024,
     },
     {
     	.name = "backup",
-        .offset = (12+8+8+8+8+1026+512)*1024*1024,
+        .offset = (32+8+8+8+8+1026+512)*1024*1024,
         .size = 256*1024,
     },	
     {
