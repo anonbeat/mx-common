@@ -1,4 +1,4 @@
-*
+/*
  * customer/boards/board-m6g18.c
  *
  * Copyright (C) 2011-2012 Amlogic, Inc.
@@ -72,7 +72,6 @@
 #include <mach/devio_aml.h>
 #include <linux/uart-aml.h>
 #include <linux/i2c-aml.h>
-#include <linux/syscore_ops.h>
 
 #include "board-m6g18.h"
 
@@ -122,7 +121,7 @@
 
 /******** AUDIODSP memory setting ************************/
 #define AUDIODSP_ADDR_START U_ALIGN(RESERVED_MEM_START) /*audiodsp memstart*/
-#define AUDIODSP_ADDR_END   (AUDIODSP_ADDR_START+SZ_1M-1)   /*audiodsp memend*/
+#define AUDIODSP_ADDR_END   (AUDIODSP_ADDR_START+SZ_1M-1) /*audiodsp memend*/
 
 /******** Frame buffer memory configuration ***********/
 #define OSD_480_PIX         (640*480)
@@ -135,29 +134,20 @@
 #define DOUBLE_BUFFER   (2)
 
 #define OSD1_MAX_MEM        U_ALIGN(OSD_1080_PIX*B32BpP*DOUBLE_BUFFER)
-#define OSD2_MAX_MEM        U_ALIGN(32*32*B32BpP)
+#define OSD2_MAX_MEM        U_ALIGN(OSD_1080_PIX*B32BpP*DOUBLE_BUFFER)
 
 /******** Reserved memory configuration ***************/
 #define OSD1_ADDR_START     U_ALIGN(AUDIODSP_ADDR_END )
 #define OSD1_ADDR_END       (OSD1_ADDR_START+OSD1_MAX_MEM - 1)
 #define OSD2_ADDR_START     U_ALIGN(OSD1_ADDR_END)
-#define OSD2_ADDR_END       (OSD2_ADDR_START +OSD2_MAX_MEM -1)
-
-/*
-#if defined(CONFIG_AM_VDEC_H264)
-#define CODEC_MEM_SIZE      U_ALIGN(32*SZ_1M)
-#else
-#define CODEC_MEM_SIZE      U_ALIGN(16*SZ_1M)
-#endif
-*/
-
+#define OSD2_ADDR_END       (OSD2_ADDR_START+OSD2_MAX_MEM - 1)
 
 #if defined(CONFIG_AM_VDEC_H264MVC)
-	#define CODEC_MEM_SIZE U_ALIGN(64*SZ_1M) 
+#define CODEC_MEM_SIZE U_ALIGN(64*SZ_1M) 
 #elif defined(CONFIG_AM_VDEC_H264) 
-	#define CODEC_MEM_SIZE U_ALIGN(32*SZ_1M) 
+#define CODEC_MEM_SIZE U_ALIGN(32*SZ_1M) 
 #else 
-	#define CODEC_MEM_SIZE U_ALIGN(16*SZ_1M) 
+#define CODEC_MEM_SIZE U_ALIGN(16*SZ_1M) 
 #endif
 
 #define CODEC_ADDR_START    U_ALIGN(OSD2_ADDR_END)
@@ -242,16 +232,6 @@ static struct resource meson_codec_resource[] = {
     },
 };
 
-#ifdef CONFIG_AML_VIDEO_RES_MGR
-static struct resource resmgr_resources[] = {
-    [0] = {
-        .start = CODEC_ADDR_START,
-        .end   = CODEC_ADDR_END,
-        .flags = IORESOURCE_MEM,
-    },
-};
-#endif
-
 #ifdef CONFIG_POST_PROCESS_MANAGER
 static struct resource ppmgr_resources[] = {
     [0] = {
@@ -268,15 +248,6 @@ static struct platform_device ppmgr_device = {
     .resource      = ppmgr_resources,
 };
 #endif
-
-#ifdef CONFIG_AML_VIDEO_RES_MGR
-static struct platform_device resmgr_device = {
-    .name       = "resmgr",
-    .id         = 0,
-    .num_resources = ARRAY_SIZE(resmgr_resources),
-    .resource      = resmgr_resources,
-};
-#endif //CONFIG_AML_VIDEO_RES_MGR
 
 #ifdef CONFIG_FREE_SCALE
 static struct resource freescale_resources[] = {
@@ -337,97 +308,6 @@ static  int __init setup_devices_resource(void)
     return 0;
 }
 
-#if defined(CONFIG_VFD_ENABLE) || defined(CONFIG_VFD_ENABLE_MODULE)
-#include <linux/input.h>
-#include <linux/input/vfd.h>
-
-static struct vfd_key vfd_key[] = {
-	{KEY_POWER,			"power",	0x04},
-	{KEY_VOLUMEDOWN,		"volumn-up",	0x0d},
-	{KEY_VOLUMEUP,  	"volumn-down",		0x02},
-    {KEY_MENU,			"menu",		0x09},
-	{KEY_UP,			"up",		0x05},
-	{KEY_DOWN,			"down",		0x0a},
-	{KEY_ENTER,			"enter",	0x01},
-};
-
-static int vfd_stb_pin_set_value(int value)
-{		
-        if(value)
-	{
-		aml_set_reg32_mask(P_PREG_PAD_GPIO4_O,(1<<22));
-        	aml_clr_reg32_mask(P_PREG_PAD_GPIO4_EN_N,(1<<22));
-	}
-	else
-	{
-
-        	aml_clr_reg32_mask(P_PREG_PAD_GPIO4_O,(1<<22));
-        	aml_clr_reg32_mask(P_PREG_PAD_GPIO4_EN_N,(1<<22));
-	}
-	return 0;
-}
-
-static int vfd_clock_pin_set_value(int value)
-{
-        //aml_set_reg32_mask(P_PREG_PAD_GPIO4_O,(value<<23));
-	if(value)
-        {
-                aml_set_reg32_mask(P_PREG_PAD_GPIO4_O,(1<<23));
-                aml_clr_reg32_mask(P_PREG_PAD_GPIO4_EN_N,(1<<23));
-        }
-        else
-        {
-
-                aml_clr_reg32_mask(P_PREG_PAD_GPIO4_O,(1<<23));
-                aml_clr_reg32_mask(P_PREG_PAD_GPIO4_EN_N,(1<<23));
-        }
-	return 0;
-}
-
-static int vfd_do_pin_set_value(int value)
-{
-
-        if(value)
-        {
-                aml_set_reg32_mask(P_PREG_PAD_GPIO4_O,(1<<24));
-                aml_clr_reg32_mask(P_PREG_PAD_GPIO4_EN_N,(1<<24));
-        }
-        else
-        {
-
-                aml_clr_reg32_mask(P_PREG_PAD_GPIO4_O,(1<<24));
-                aml_clr_reg32_mask(P_PREG_PAD_GPIO4_EN_N,(1<<24));
-        }
-        return 0;
-
-}
-
-static int vfd_di_pin_get_value(void)
-{		
-        aml_set_reg32_mask(P_PREG_PAD_GPIO4_EN_N,(1<<24));
-	return ((aml_read_reg32(P_PREG_PAD_GPIO4_I))&(1<<24)) ? 1:0;	 		
-}
-
-static struct vfd_platform_data vfd_pdata = {
-		.key = &vfd_key[0],
-		.key_num = ARRAY_SIZE(vfd_key),
-		.set_stb_pin_value = vfd_stb_pin_set_value,
-		.set_clock_pin_value = vfd_clock_pin_set_value,
-		.set_do_pin_value = vfd_do_pin_set_value,
-		.get_di_pin_value = vfd_di_pin_get_value,
-};
-
-static struct platform_device vfd_device = {
-		.name = "m1-vfd",
-		.id = 0,
-		.num_resources = 0,
-		.resource = NULL,
-		.dev = {
-			.platform_data = &vfd_pdata,
-		}
-};
-#endif
-
 /***********************************************************
 *Remote Section
 ************************************************************/
@@ -478,11 +358,7 @@ static struct aml_i2c_platform aml_i2c_plat_a = {
     .wait_xfer_interval   = 5,
     .master_no          = AML_I2C_MASTER_A,
     .use_pio            = 0,
-#if defined (CONFIG_TH_MXL68X)
-    .master_i2c_speed   = AML_I2C_SPPED_50K,
-#else
     .master_i2c_speed   = AML_I2C_SPPED_300K,
-#endif
 
     .master_pinmux      = {
         .chip_select    = pinmux_dummy_share,
@@ -663,13 +539,12 @@ static pinmux_set_t aml_uart_ao = {
     .pinmux = &uart_pins[0]
 };
 
-static struct aml_uart_platform  __initdata aml_uart_plat = {
+static struct aml_uart_platform aml_uart_plat = {
     .uart_line[0]   = UART_AO,
     .uart_line[1]   = UART_A,
     .uart_line[2]   = UART_B,
     .uart_line[3]   = UART_C,
     .uart_line[4]   = UART_D,
-
     .pinmux_uart[0] = (void*)&aml_uart_ao,
     .pinmux_uart[1] = NULL,
     .pinmux_uart[2] = NULL,
@@ -765,21 +640,6 @@ static struct aml_nand_platform aml_nand_mid_platform[] = {
         .T_REA = 20,
         .T_RHOH = 15,
     },
-#elif  defined CONFIG_SPI_NAND_COMPATIBLE || defined CONFIG_SPI_NAND_EMMC_COMPATIBLE
-
-    {
-        .name = NAND_BOOT_NAME,
-        .chip_enable_pad = AML_NAND_CE0,
-        .ready_busy_pad = AML_NAND_CE0,
-        .platform_nand_data = {
-            .chip =  {
-                .nr_chips = 1,
-                .options = (NAND_TIMING_MODE5 | NAND_ECC_BCH60_1K_MODE),
-            },
-        },
-        .T_REA = 20,
-        .T_RHOH = 15,
-    },
 #endif
     {
         .name = NAND_NORMAL_NAME,
@@ -827,20 +687,12 @@ static struct mtd_partition spi_partition_info[] = {
             {
                     .name = "bootloader",
                     .offset = 0,
-#ifdef CONFIG_MESON_TRUSTZONE
-                    .size = 0x100000,
-#else
                     .size = 0x60000,
-#endif
             },
     
     {
         .name = "ubootenv",
-#ifdef CONFIG_MESON_TRUSTZONE
-        .offset = 0x100000,
-#else
         .offset = 0x80000,
-#endif
         .size = 0x8000,
     },
    
@@ -870,8 +722,8 @@ static struct platform_device amlogic_spi_nor_device = {
 };
 #endif
 
-#if defined(CONFIG_AML_EMMC_KEY) || defined(CONFIG_AML_NAND_KEY)
-static char * secure_device[3]={"nand_key","emmc_key",NULL};
+#if defined(CONFIG_AML_CARD_KEY) || defined(CONFIG_AML_NAND_KEY)
+static char * secure_device[2]={"nand_key",NULL};
 static struct platform_device aml_keys_device = {
     .name   = "aml_keys",
     .id = -1,
@@ -889,146 +741,6 @@ static struct platform_device aml_keys_device = {
 /***********************************************************************
  * WIFI  Section
  **********************************************************************/
-/**
-*GPIOX_0			-->WIFI_SD_D0
-*GPIOX_1			-->WIFI_SD_D1
-*GPIOX_2			-->WIFI_SD_D2
-*GPIOX_3			-->WIFI_SD_D3
-
-*GPIOX_8			-->WIFI_SD_CMD
-*GPIOX_9			-->WIFI_SD_CLK
-
-*WIFI_EN            -->GPIOC_7
-
-*WIFI_WAKE		-->GPIOX_11
-*32K_CLOCK_OUT	-->GPIOX_12 (CLK_OUT3)
-*/
-#ifdef  CONFIG_AM_WIFI_SD_MMC
-/* WIFI ON Flag */
-static int WIFI_ON=0;
-/* BT ON Flag */
-static int BT_ON=0;
-#define DBG_LINE_INFO()  printk(KERN_INFO "[%s] in\n",__func__)
-#ifdef CONFIG_RTL8189_SDIO_WIFI
-/*
-*WIFI_EN            -->GPIOAO_10
-*WIFI_CS            -->GPIOAO_8
-*/
-static void extern_wifi_cs(int enable)
-{
-    aml_set_reg32_bits(AOBUS_REG_ADDR(0x24), 0, 8, 1);  
-    if(enable)
-    aml_set_reg32_bits(AOBUS_REG_ADDR(0x24), 1, 24, 1);  
-    else
-    aml_set_reg32_bits(AOBUS_REG_ADDR(0x24), 0, 24, 1);  
-}
-
-static void reg_on_control(int is_on)
-{
-    aml_set_reg32_bits(AOBUS_REG_ADDR(0x24), 0, 10, 1);  
-    if(is_on)
-    aml_set_reg32_bits(AOBUS_REG_ADDR(0x24), 1, 26, 1);  
-    else
-    aml_set_reg32_bits(AOBUS_REG_ADDR(0x24), 0, 26, 1);  
-}
-
-void extern_wifi_power(int is_power)
-{
-    extern_wifi_cs(is_power);
-    reg_on_control(is_power);
-}
-
-EXPORT_SYMBOL(extern_wifi_power);
-
-#else
-
-static void reg_on_control(int is_on)
-{
-        DBG_LINE_INFO();
-   //set wifi_en
-        aml_set_reg32_bits(CBUS_REG_ADDR(0x2012),0,7,1);//mode
-    if(is_on){
-        aml_set_reg32_bits(CBUS_REG_ADDR(0x2013),1,7,1);//mode
-    }
-        else{
-        /* only pull donw reg_on pin when wifi and bt off */
-        if((!WIFI_ON) && (!BT_ON)){
-                aml_set_reg32_bits(CBUS_REG_ADDR(0x2013),0,7,1);//mode
-                printk("WIFI BT Power down(WIFI_EN)\n");
-        }
-        }
-}
-
-static void extern_wifi_power(int is_power)
-{
-        DBG_LINE_INFO();
-
-        WIFI_ON = is_power;
-        mdelay(200);
-        reg_on_control(is_power);
-
-}
-EXPORT_SYMBOL(extern_wifi_power);
-#endif
-
-static void wifi_gpio_init(void)
-{
-//set status
-    //WIFI_EN WIFI_PWREN  WLAN_RST --->out	:0
-        aml_set_reg32_bits(CBUS_REG_ADDR(0x2012),0,7,1);//mode
-//   	gpio_set_status(PAD_GPIOC_7,gpio_status_out);
-//	gpio_set_status(PAD_GPIOC_8,gpio_status_out);
-//	gpio_set_status(PAD_GPIOC_9,gpio_status_out);
-
-	//WIFI_WAKE -->1GPIOX_11   in	:
-        aml_set_reg32_bits(CBUS_REG_ADDR(0x2018),1,11,1);//mode
-//    	gpio_set_status(PAD_GPIOX_11,gpio_status_in);
-
-	//set pull-up
-	aml_set_reg32_mask(P_PAD_PULL_UP_REG4,0xf|1<<8|1<<9|1<<11|1<<12);
-	aml_set_reg32_mask(P_PAD_PULL_UP_REG2,1<<7);	
-}
-
-static void wifi_clock_enable(int is_on)
-{
-    //set clk 32k for wifi  
-    //GPIOX_12 (CLK_OUT3)  //reg : 108b  sr_sl:22-25  div:13-19    enable:21
-    DBG_LINE_INFO();
-
-        aml_set_reg32_bits(CBUS_REG_ADDR(0x2018),0,12,1);//mode
-//	gpio_set_status(PAD_GPIOX_12,gpio_status_out);			//set  GPIOX_12 out
-	aml_set_reg32_mask(P_HHI_GEN_CLK_CNTL2,1<<22);//set clk source
-	aml_clr_reg32_mask(P_HHI_GEN_CLK_CNTL2,0x3f<<13);//set div ==1
-	aml_set_reg32_mask(P_HHI_GEN_CLK_CNTL2,1<<21);//set enable clk
-	aml_set_reg32_mask(P_PERIPHS_PIN_MUX_3,0x1<<21);//set mode GPIOX_12-->CLK_OUT3
-}
-
-
-void extern_wifi_set_enable(int is_on)
-{
-    DBG_LINE_INFO();
-}
-EXPORT_SYMBOL(extern_wifi_set_enable);
-
-void wifi_dev_init(void)
-{
-	DBG_LINE_INFO();
-	wifi_clock_enable(1);
-	udelay(200);
-	wifi_gpio_init();
-	extern_wifi_power(0);
-//	extern_wifi_set_power(0);//ainou for wl_reg_on
-	//udelay(200);
-	//udelay(200);
-	mdelay(200);
-	extern_wifi_power(1);
-//	extern_wifi_set_power(1);//ainou for wl_reg_on
-}
-
-EXPORT_SYMBOL(wifi_dev_init);
-
-
-#else
 /* WIFI ON Flag */
 static int WIFI_ON;
 /* BT ON Flag */
@@ -1041,7 +753,7 @@ static void reg_on_control(int is_on)
     CLEAR_CBUS_REG_MASK(PREG_PAD_GPIO2_EN_N, (1<<8));//GPIOC_8 ==WIFI_EN
 
     if(is_on){
-        SET_CBUS_IO2_O, (1<<8));
+        SET_CBUS_REG_MASK(PREG_PAD_GPIO2_O, (1<<8));
     }
     else{
         /* only pull donw reg_on pin when wifi and bt off */
@@ -1051,11 +763,6 @@ static void reg_on_control(int is_on)
         }
     }
 }
-#endif
-/***********************************************************************
- * Card Reader Section
- **********************************************************************/
-
 #ifdef CONFIG_CARDREADER
 static struct resource meson_card_resource[] = {
     [0] = {
@@ -1064,101 +771,35 @@ static struct resource meson_card_resource[] = {
         .flags = 0x200,
     }
 };
-#ifdef CONFIG_RTL8189_SDIO_WIFI
+#if 0
+static void extern_wifi_power(int is_power)
+{
+    WIFI_ON = is_power;
+    reg_on_control(is_power);
+    /*
+    CLEAR_CBUS_REG_MASK(PERIPHS_PIN_MUX_1,(1<<11));
+    CLEAR_CBUS_REG_MASK(PERIPHS_PIN_MUX_0,(1<<18));
+    CLEAR_CBUS_REG_MASK(PREG_PAD_GPIO2_EN_N, (1<<8));
+    if(is_power)
+        SET_CBUS_REG_MASK(PREG_PAD_GPIO2_O, (1<<8));
+    else
+        CLEAR_CBUS_REG_MASK(PREG_PAD_GPIO2_O, (1<<8));
+        */
+}
+
+EXPORT_SYMBOL(extern_wifi_power);
+#endif
 static void sdio_extern_init(void)
 {
-//#if defined(CONFIG_BCM4329_HW_OOB) || defined(CONFIG_BCM4329_OOB_INTR_ONLY)/* Jone add */
+#if defined(CONFIG_BCM4329_HW_OOB) || defined(CONFIG_BCM4329_OOB_INTR_ONLY)/* Jone add */
     gpio_set_status(PAD_GPIOX_11,gpio_status_in);
     gpio_irq_set(PAD_GPIOX_11,GPIO_IRQ(4,GPIO_IRQ_RISING));
 
     extern_wifi_power(1);
-//#endif
-#ifdef  CONFIG_AM_WIFI_SD_MMC
-	wifi_dev_init();
 #endif
 }
-#endif
-
-static void inand_extern_init(void)
-{
-    aml_clr_reg32_mask(P_PAD_PULL_UP_REG3, 0xf<<0);     //data pull up
-    aml_clr_reg32_mask(P_PAD_PULL_UP_REG3, 0x3<<10);      //clk cmd pull up
-    aml_clr_reg32_mask(P_PERIPHS_PIN_MUX_2,(0xfff<<16)); //clr nand ce&data
-    aml_set_reg32_mask(P_PERIPHS_PIN_MUX_6,(0x1f<<25));//set sdio c cmd&data
-    aml_set_reg32_mask(P_PERIPHS_PIN_MUX_6,(0x1<<24));  //set sdio c clk
-    //pinmux_set(&aml_inand);
-}
-
-
-static struct mtd_partition inand_partition_info[] = {
-    {
-        .name = "bootloader",
-        .offset = 0,
-        .size = 0x60000,
-    },
-    {
-        .name = "ubootenv",
-        .offset = 0x80000,
-        .size = 0x8000,
-    },
-    {
-        .name = "logo",
-        .offset = 32*SZ_1M+40*SZ_1M,
-        .size = 8*SZ_1M,
-    },
-    {
-        .name = "aml_logo",
-        .offset = 48*SZ_1M+40*SZ_1M,
-        .size = 8*SZ_1M,
-    },
-    {
-        .name = "recovery",
-        .offset = 64*SZ_1M+40*SZ_1M,
-        .size = 8*SZ_1M,
-    },
-    {
-        .name = "boot",
-        .offset = 96*SZ_1M+40*SZ_1M,
-        .size = 8*SZ_1M,
-    },
-    {
-        .name = "system",
-        .offset = 128*SZ_1M+40*SZ_1M,
-        .size = 512*SZ_1M+512*SZ_1M,
-    },
-    {
-        .name = "cache",
-        .offset = 640*SZ_1M+512*SZ_1M+40*SZ_1M,
-        .size = 512*SZ_1M,
-    },
-#if 1
-    {
-	.name = "backup",
-        .offset = 1152*SZ_1M+512*SZ_1M+40*SZ_1M,
-        .size = 256*SZ_1M,
-    },
-    {
-        .name = "data",
-        .offset = MTDPART_OFS_APPEND,
-        .size = MTDPART_SIZ_FULL,
-    },
-
-#else
-    {
-        .name = "data",
-        .offset = 1152*SZ_1M+512*SZ_1M+40*SZ_1M,
-        .size = 512*SZ_1M,
-    },
-    {
-        .name = "NFTL_Part",
-        .offset = MTDPART_OFS_APPEND,
-        .size = MTDPART_SIZ_FULL,
-    },
-#endif
-};
-
 static struct aml_card_info meson_card_info[] = {
-	{
+    [0] = {
         .name           = "sd_card",
         .work_mode      = CARD_HW_MODE,
         .io_pad_type        = SDHC_CARD_0_5,
@@ -1191,57 +832,11 @@ static struct aml_card_info meson_card_info[] = {
         .card_power_output_mask = PREG_IO_7_MASK,
         .card_power_en_lev  = 1,
         .card_wp_en_reg     = 0,
-        .ca    .card_wp_input_reg  = 0,
+        .card_wp_en_mask    = 0,
+        .card_wp_input_reg  = 0,
         .card_wp_input_mask = 0,
-#ifdef CONFIG_RTL8189_SDIO_WIFI
         .card_extern_init   = sdio_extern_init,
-#endif
     },
-
-	{
-        .name           = "inand_card",
-        .work_mode      = CARD_HW_MODE,
-        .io_pad_type        = SDHC_BOOT_0_11,
-        .card_ins_en_reg    = 0,
-        .card_ins_en_mask   = 0,
-        .card_ins_input_reg = 0,
-        .card_ins_input_mask    = 0,
-        .card_power_en_reg  = 0,
-        .card_power_en_mask = 0,
-        .card_power_output_reg  = 0,
-        .card_power_output_mask = 0,
-        .card_power_en_lev  = 0,
-        .card_wp_en_reg     = 0,
-        .card_wp_en_mask    = 0,
-        .card_wp_input_reg  = 0,
-        .card_wp_input_mask = 0,
-        .card_extern_init   = inand_extern_init,
-        .partitions = inand_partition_info,
-        .nr_partitions = ARRAY_SIZE(inand_partition_info),
-    },
-/*
-	{
-        .name           = "inand_card_lp",
-        .work_mode      = CARD_HW_MODE,
-        .io_pad_type        = SDHC_BOOT_0_11,
-        .card_ins_en_reg    = 0,
-        .card_ins_en_mask   = 0,
-        .card_ins_input_reg = 0,
-        .card_ins_input_mask    = 0,
-        .card_power_en_reg  = 0,
-        .card_power_en_mask = 0,
-        .card_power_output_reg  = 0,
-        .card_power_output_mask = 0,
-        .card_power_en_lev  = 0,
-        .card_wp_en_reg     = 0,
-        .card_wp_en_mask    = 0,
-        .card_wp_input_reg  = 0,
-        .card_wp_input_mask = 0,
-		.card_extern_init = inand_extern_init,
-		.partitions = inand_partition_info,
-		.nr_partitions = ARRAY_SIZE(inand_partition_info),
-    },
-*/
 };
 
 static struct aml_card_platform meson_card_platform = {
@@ -1327,7 +922,8 @@ static int cpu_sdio_init(unsigned port)
                 aml_set_reg32_mask(P_PERIPHS_PIN_MUX_8,0x1<<1);
                 break;
         case MESON_SDIO_PORT_B:
-                aml_set_reg32_mask(P_PERIPHS_PIN_MUk(P_PERIPHS_PIN_MUX_2,0x1<<11);
+                aml_set_reg32_mask(P_PERIPHS_PIN_MUX_2,0x3d<<10);
+                aml_set_reg32_mask(P_PERIPHS_PIN_MUX_2,0x1<<11);
                 break;
         case MESON_SDIO_PORT_C://SDIOC GPIOB_2~GPIOB_7
             aml_clr_reg32_mask(P_PERIPHS_PIN_MUX_2,(0x1f<<22));
@@ -1453,7 +1049,8 @@ static struct platform_device aml_mmc_device = {
 /*
 #define IO_CBUS_BASE        0xf1100000  ///2M
 #define IO_AXI_BUS_BASE     0xf1300000  ///1M
-#define IO_PL310_BASE       0xf2200000000  ///4k
+#define IO_PL310_BASE       0xf2200000  ///4k
+#define IO_PERIPH_BASE      0xf2300000  ///4k
 #define IO_APB_BUS_BASE     0xf3000000  ///8k
 #define IO_DOS_BUS_BASE     0xf3010000  ///64k
 #define IO_AOBUS_BASE       0xf3100000  ///1M
@@ -1574,7 +1171,8 @@ static void __init meson_fixup(struct machine_desc *mach, struct tag *tag, char 
     mach->video_end      = RESERVED_MEM_END;
 
     m->nr_banks = 0;
-    pbank = &m-k->start = PAGE_ALIGN(PHYS_MEM_START);
+    pbank = &m->bank[m->nr_banks];
+    pbank->start = PAGE_ALIGN(PHYS_MEM_START);
     pbank->size  = SZ_64M & PAGE_MASK;
     m->nr_banks++;
     pbank = &m->bank[m->nr_banks];
@@ -1592,28 +1190,35 @@ static void __init meson_fixup(struct machine_desc *mach, struct tag *tag, char 
  **********************************************************************/
 static void set_usb_a_vbus_power(char is_power_on)
 {
-       pr_info("%s: power_on = 0x%x\n", __func__, is_power_on);
-       if (is_power_on) {
-               gpio_set_status(PAD_GPIOD_9, gpio_status_out);
-               gpio_out(PAD_GPIOD_9, 1);
-       } else {
-               gpio_set_status(PAD_GPIOD_9, gpio_status_out);
-               gpio_out(PAD_GPIOD_9, 0);
-       }
+
+#define USB_A_POW_GPIO  PREG_EGPIO
+#define USB_A_POW_GPIO_BIT  25
+#define USB_A_POW_GPIO_BIT_ON   1
+#define USB_A_POW_GPIO_BIT_OFF  0
+    if(is_power_on){
+        printk( "set usb port power on (board gpio %d)!\n",USB_A_POW_GPIO_BIT);
+
+        aml_set_reg32_bits(CBUS_REG_ADDR(0x2012),0,USB_A_POW_GPIO_BIT,1);//mode
+        aml_set_reg32_bits(CBUS_REG_ADDR(0x2013),1,USB_A_POW_GPIO_BIT,1);//out
+        //set_gpio_mode(USB_A_POW_GPIO,USB_A_POW_GPIO_BIT,GPIO_OUTPUT_MODE);
+        //set_gpio_val(USB_A_POW_GPIO,USB_A_POW_GPIO_BIT,USB_A_POW_GPIO_BIT_ON);
+    }
+    else    {
+        printk("set usb port power off (board gpio %d)!\n",USB_A_POW_GPIO_BIT);
+        aml_set_reg32_bits(CBUS_REG_ADDR(0x2012),0,USB_A_POW_GPIO_BIT,1);//mode
+        aml_set_reg32_bits(CBUS_REG_ADDR(0x2013),0,USB_A_POW_GPIO_BIT,1);//out
+    }
 }
 static  int __init setup_usb_devices(void)
 {
-    struct lm_device * usb_ld_a, *usb_ld_b;
-    usb_ld_a = alloc_usb_lm_device(USB_PORT_IDX_A);
-    usb_ld_b = alloc_usb_lm_device (USB_PORT_IDX_B);
-    usb_ld_a->param.usb.set_vbus_power = set_usb_a_vbus_power;
-//#ifdef CONFIG_SMP    
- 	usb_ld_a->param.usb.port_type = USB_PORT_TYPE_OTG; //USB_PORT_TYPE_HOST;
- 	usb_ld_b->param.usb.port_type = USB_PORT_TYPE_HOST;
-//#endif    
-    lm_device_register(usb_ld_a);
-    lm_device_register(usb_ld_b);
-    return 0;
+		struct lm_device * usb_ld_a, *usb_ld_b;
+		usb_ld_a = alloc_usb_lm_device(USB_PORT_IDX_A);
+		usb_ld_b = alloc_usb_lm_device (USB_PORT_IDX_B);
+		usb_ld_a->param.usb.set_vbus_power = set_usb_a_vbus_power;
+		usb_ld_b->param.usb.port_type = USB_PORT_TYPE_HOST;
+		lm_device_register(usb_ld_a);
+		lm_device_register(usb_ld_b);
+		return 0;
 }
 /***********************************************************************
  *Sata 5v Setting section  gpioc_5
@@ -1655,22 +1260,8 @@ static struct wifi_power_platform_data wifi_plat_data = {
     .usb_set_power = usb_wifi_power,
 };
 #elif defined(CONFIG_AM_WIFI_SD_MMC)&&defined(CONFIG_CARDREADER)
-
-static void sdio_wifi_power(int is_power) {
-	if(is_power) {
-	 	printk("sdio_wifi_power: on.\n");
-        	aml_set_reg32_bits(CBUS_REG_ADDR(0x2018),0,11,1);//mode
-        	aml_set_reg32_bits(CBUS_REG_ADDR(0x2019),1,11,1);//mode
-	}
-	else {
-	 	printk("sdio_wifi_power: off.\n");
-        	aml_set_reg32_bits(CBUS_REG_ADDR(0x2018),0,11,1);//mode
-        	aml_set_reg32_bits(CBUS_REG_ADDR(0x2019),0,11,1);//mode
-	}
-}
-static struct wifi_power_platform_data wifi_plat_data = {
-    .usb_set_power = sdio_wifi_power,
-
+    wifi_plat_data = {
+    
 };
 #endif
 
@@ -1705,7 +1296,9 @@ static struct platform_device aml_efuse_device = {
     .name   = "efuse",
     .id = -1,
     .dev = {
-                .platform_data = &aml_efus;
+                .platform_data = &aml_efuse_plat,
+           },
+};
 
 // BSP EFUSE layout setting
 static  efuseinfo_item_t aml_efuse_setting[] = {
@@ -1779,14 +1372,6 @@ static  struct platform_device aml_rtc_device = {
             .id               = -1,
     };
 #endif
-
-#ifdef CONFIG_MESON_TRUSTZONE
-static struct platform_device aml_secure_monitor_device = {
-	.name = "secure_monitor",
-	.id = -1,
-};
-#endif
-
 #if defined(CONFIG_SUSPEND)
 static void m6ref_set_vccx2(int power_on)
 {
@@ -1801,7 +1386,7 @@ static void m6ref_set_vccx2(int power_on)
         // Test_n   system LED
 //      aml_set_reg32_bits(0xc8100024,0,31,1); 
 //		writel(0x80000004,0xc8100024);
-//		set_sata_power(1);   // disable sata by default,please enable it by project
+		set_sata_power(1);
     }
     else {
         printk(KERN_INFO "%s() Power OFF\n", __FUNCTION__);
@@ -1817,7 +1402,7 @@ static void m6ref_set_vccx2(int power_on)
 //		writel(0x4,0xc8100024);
 //        aml_set_reg32_bits(AOBUS_REG_ADDR(0x24), 1, 31, 1);
         //save_pinmux();
-//        set_sata_power(0);  // disable sata by default,please enable it by project
+        set_sata_power(0);
     }
     #ifdef CONFIG_AM_WIFI_USB
         if(wifi_plat_data.usb_set_power)
@@ -1867,20 +1452,11 @@ static struct hdmi_phy_set_data brd_phy_data[] = {
     {-1,   -1},         //end of phy setting
 };
 
-static struct vendor_info_data vendor_data = {
-    .vendor_name = "Amlogic",               // Max Chars: 8
-    .vendor_id = 0x000000,                  // Refer to http://standards.ieee.org/develop/regauth/oui/oui.txt
-                                            // here for test only
-    .product_desc = "MX MBox g18ref",         // Max Chars: 16
-    .cec_osd_string = "Amlogic MBox",                 // Max Chars: 14
-};
-
 static struct hdmi_config_platform_data aml_hdmi_pdata = {
     .hdmi_5v_ctrl = m6ref_hdmi_5v_ctrl,
     .hdmi_3v3_ctrl = NULL,
     .hdmi_pll_vdd_ctrl = NULL,
     .phy_data = brd_phy_data,
-    .vend_data = &vendor_data,
 };
 #endif
 /***********************************************************************
@@ -1898,8 +1474,8 @@ static struct regulator_consumer_supply vcck_data[] = {
 static struct regulator_init_data vcck_init_data = {
     .constraints = { /* VCCK default 1.2V */
         .name = "vcck",
-        .min_uV =  1000000, //962000,
-        .max_uV =  1400000, //1209000,
+        .min_uV =  1010000, //962000,
+        .max_uV =  1210000, //1209000,
         .valid_ops_mask = REGULATOR_CHANGE_VOLTAGE | REGULATOR_CHANGE_STATUS,
     },
     .num_consumer_supplies = ARRAY_SIZE(vcck_data),
@@ -1908,10 +1484,10 @@ static struct regulator_init_data vcck_init_data = {
 
 // pwm duty for vcck voltage
 static unsigned int vcck_pwm_table[MESON_CS_MAX_STEPS] = {
-	0x040018, 0x050017, 0x060016, 0x070015,
-	0x080014, 0x090013, 0x0a0012, 0x0b0011,
-	0x0c0010, 0x0d000f, 0x0e000e, 0x0f000d,
-	0x10000c, 0x11000b, 0x12000a, 0x130009,
+	0x01001b, 0x01001b, 0x030019, 0x030019, 
+	0x060016, 0x060016, 0x0b0011, 0x0b0011, 
+	0x11000b, 0x11000b, 0x11000b, 0x11000b, 
+	0x170005, 0x170005, 0x170005, 0x170005,  
 };
 static int get_voltage() {
 //    printk("***vcck: get_voltage");
@@ -1957,10 +1533,52 @@ static void vcck_pwm_init() {
 //1.2V   1GHz~1.1xGHz
 //1.3V   1.2GHz~1.37GHz
 //1.38V  1.39~1.5GHz
-//792M-------- 1.04V
 static struct meson_cs_pdata_t vcck_pdata = {
     .meson_cs_init_data = &vcck_init_data,
-    .voltage_st   .freq   = 840000,
+    .voltage_step_table = {
+        1380000, 1380000, 1350000, 1350000,
+        1300000, 1300000, 1210000, 1210000,
+        1110000, 1110000, 1110000, 1110000,
+        1010000, 1010000, 1010000, 1010000,
+    },
+    .default_uV = 1110000,
+    .get_voltage = get_voltage,
+    .set_voltage = set_voltage,
+};
+static struct meson_opp vcck_opp_table[] = {
+    /* freq must be in descending order */
+    {
+        .freq   = 1500000,
+        .min_uV = 1380000,
+        .max_uV = 1380000,
+    },
+    {
+        .freq   = 1320000,
+        .min_uV = 1300000,
+        .max_uV = 1300000,
+    },
+    {
+        .freq   = 1200000,
+        .min_uV = 1210000,
+        .max_uV = 1210000,
+    },
+    {
+        .freq   = 1080000,
+        .min_uV = 1210000,
+        .max_uV = 1210000,
+    },
+    {
+        .freq   = 1000000,
+        .min_uV = 1110000,
+        .max_uV = 1110000,
+    },
+    {
+        .freq   = 984000,
+        .min_uV = 1110000,
+        .max_uV = 1110000,
+    },
+    {
+        .freq   = 840000,
         .min_uV = 1110000,
         .max_uV = 1110000,
     },
@@ -1982,7 +1600,8 @@ static struct meson_cs_pdata_t vcck_pdata = {
     {
         .freq   = 200000,
         .min_uV = 1010000,
-        .max_uV = 1010000,
+      //  .max_uV = 979000,
+      	.max_uV = 1010000,
     }
 };
 
@@ -2118,7 +1737,97 @@ static  struct key_input_platform_data  key_input_pdata = {
     .scan_period = 20,
     .fuzz_time = 60,
     .key_code_list = &_key_code_list[0],
-    .key_num = dec_pinmux_set);
+    .key_num = ARRAY_SIZE(_key_code_list),
+    .scan_func = key_scan,
+    .init_func = key_input_init_func,
+    .config = 0,
+};
+
+static struct platform_device input_device_key = {
+    .name = "meson-keyinput",
+    .id = 0,
+    .num_resources = 0,
+    .resource = NULL,
+    .dev = {
+        .platform_data = &key_input_pdata,
+    }
+};
+#endif
+
+
+
+/***********************************************************************
+ * Audio section
+ **********************************************************************/
+static struct resource aml_m6_audio_resource[] = {
+    [0] =   {
+        .start      =   0,
+        .end        =   0,
+        .flags      =   IORESOURCE_MEM,
+    },
+};
+
+static struct platform_device aml_audio = {
+    .name           = "aml-audio",
+    .id             = 0,
+};
+
+static struct platform_device aml_audio_dai = {
+    .name           = "aml-dai",
+    .id             = 0,
+};
+
+#if  defined(CONFIG_AM_TV_OUTPUT2)
+static struct resource vout2_device_resources[] = {
+    [0] = {
+        .start = 0,
+        .end   = 0,
+        .flags = IORESOURCE_MEM,
+    },
+};
+
+static struct platform_device vout2_device = {
+    .name       = "mesonvout2",
+    .id         = 0,
+    .num_resources = ARRAY_SIZE(vout2_device_resources),
+    .resource      = vout2_device_resources,
+};
+#endif
+
+#if defined(CONFIG_SND_SOC_DUMMY_CODEC)
+static pinmux_item_t dummy_codec_pinmux[] = {
+    /* I2S_MCLK I2S_BCLK I2S_LRCLK I2S_DOUT */
+    {
+        .reg = PINMUX_REG(9),
+        .setmask = (1 << 7) | (1 << 5) | (1 << 9) | (1 << 4),
+        .clrmask = (7 << 19) | (7 << 1) | (3 << 10) | (1 << 6),
+    },
+    {
+        .reg = PINMUX_REG(8),
+        .clrmask = (0x7f << 24),
+    },
+    /* spdif out from GPIOC_9 */
+    { 
+	.reg = PINMUX_REG(3),
+	.setmask = (1<<24),
+    },
+    /* mask spdif out from GPIOE_8 */
+    {
+	.reg = PINMUX_REG(9),
+	.clrmask = (1<<0),
+    },
+    PINMUX_END_ITEM
+};
+
+static pinmux_set_t dummy_codec_pinmux_set = {
+    .chip_select = NULL,
+    .pinmux = &dummy_codec_pinmux[0],
+};
+
+static void dummy_codec_device_init(void)
+{
+    /* audio pinmux */
+    pinmux_set(&dummy_codec_pinmux_set);
 }
 
 static void dummy_codec_device_deinit(void)
@@ -2185,8 +1894,6 @@ static struct resource amlogic_dvb_resource[]  = {
 static int dvb_io_setup(void *p)
 {
 	printk(KERN_ERR "dvb_io_setup start\n");
-
-#if !defined (CONFIG_AMLOGIC_DYNAMIC_FEANDDMX_CONFIG)	
 	{/*FEC_B*/
 		static pinmux_item_t fec_pins[] = {
 		    {
@@ -2209,11 +1916,9 @@ static int dvb_io_setup(void *p)
 		};
 		pinmux_set(&fec_pinmux_set);
 	}
-#endif
-	
 #if 1
 	{
-#if defined(CONFIG_I2C_SW_AML)
+#if 0	
 		static pinmux_item_t i2c_pins[] = {
 		    {/*sw i2c*/
 		        .reg = PINMUX_REG(5),
@@ -2302,7 +2007,20 @@ static struct resource dib7090p_resource[]  = {
 };
 
 static  struct platform_device dib7090p_device = {
-	.name URCE_MEM,
+	.name             = "DiB7090P",
+	.id               = -1,
+	.num_resources    = ARRAY_SIZE(dib7090p_resource),
+	.resource         = dib7090p_resource,
+};
+#endif//CONFIG_AM_DIB7090P
+
+#ifdef CONFIG_AM_MXL101
+static struct resource mxl101_resource[]  = {
+
+	[0] = {
+		.start = 0,                                    //frontend  i2c adapter id
+		.end   = 0,
+		.flags = IORESOURCE_MEM,
 		.name  = "frontend0_i2c"
 	},
 	[1] = {
@@ -2373,18 +2091,6 @@ static struct resource avl6211_resource[]  = {
 		.flags = IORESOURCE_MEM,
 		.name  = "frontend0_tuner_addr"
 	},
-        [5] = {
-                .start = PAD_GPIOD_4,  //DVBS2 LNBON/OFF pin
-                .end   = PAD_GPIOD_4,
-                .flags = IORESOURCE_MEM,
-                .name  = "frontend0_LNBON/OFF"
-        },
-	[6] = {
-		.start = PAD_GPIOD_3,
-		.end   = PAD_GPIOD_3,
-		.flags = IORESOURCE_MEM,
-		.name  = "frontend0_ANTOVERLOAD"
-	},
 };
 
 static  struct platform_device avl6211_device = {
@@ -2393,31 +2099,6 @@ static  struct platform_device avl6211_device = {
 	.num_resources    = ARRAY_SIZE(avl6211_resource),
 	.resource         = avl6211_resource,
 };
-
-#ifdef CONFIG_TH_A8304
-static struct resource a8304_resource[] = {
-         [0] = {
-                .start = 0,                                    //a8304 i2c adapter id
-                .end   = 0,
-                .flags = IORESOURCE_MEM,
-                .name  = "a8304_i2c"
-        },
-        [1] = {
-                .start = 0x0b,                                 //a8304 address
-                .end   = 0x0b,
-                .flags = IORESOURCE_MEM,
-                .name  = "a8304_addr"
-        },
-};
-
-static  struct platform_device a8304_device = {
-        .name             = "a8304",
-        .id               = -1,
-        .num_resources    = ARRAY_SIZE(a8304_resource),
-        .resource         = a8304_resource,
-};
-#endif //CONFIG_TH_A8304
-
 #endif//CONFIG_AM_AVL6211
 
 #ifdef CONFIG_AM_ITE9173
@@ -2453,7 +2134,8 @@ static struct resource ite9173_resource[]  = {
 		.name  = "frontend0_TUNER_POWER"
 	},
 	[5] = {
-		.start = PAD_GPIOB_20,//(GPIOB_bank_bit0_23(20)<<16)|0_23(20),
+		.start = PAD_GPIOB_20,//(GPIOB_bank_bit0_23(20)<<16)|GPIOB_bit_bit0_23(20),  // ANT_OVERLOAD pin
+		.end   = PAD_GPIOB_20,//(GPIOB_bank_bit0_23(20)<<16)|GPIOB_bit_bit0_23(20),
 		.flags = IORESOURCE_MEM,
 		.name  = "frontend0_ANT_OVERLOAD"
 	},
@@ -2503,226 +2185,6 @@ static  struct platform_device lgs9xb1_device = {
 };
 #endif//CONFIG_AM_LGS9XB1
 
-#if defined(CONFIG_TH_SONY_T2)
-
-static struct resource cxd2834_resource[]  = {
-
-        [0] = {
-                .start = PAD_GPIOD_8,                           //frontend 0 reset pin
-                .end   = PAD_GPIOD_8,
-                .flags = IORESOURCE_MEM,
-                .name  = "frontend0_reset"
-        },
-        [1] = {
-                .start = 0,                                    //frontend  i2c adapter id
-                .end   = 0,
-                .flags = IORESOURCE_MEM,
-                .name  = "frontend0_i2c"
-        },
-        [2] = {
-                .start = 0xC0,                                 //frontend 0 tuner address
-                .end   = 0xC0,
-                .flags = IORESOURCE_MEM,
-                .name  = "frontend0_tuner_addr"
-        },
-        [3] = {
-                .start = 0xD8,                                 //frontend 0 demod address
-                .end   = 0xD8,
-                .flags = IORESOURCE_MEM,
-                .name  = "frontend0_demod_addr"
-        },
-
-};
-static  struct platform_device cxd2834_device = {
-        .name             = "cxd2834",
-        .id               = 0,
-        .num_resources    = ARRAY_SIZE(cxd2834_resource),
-        .resource         = cxd2834_resource,
-};
-#endif
-
-
-#if defined(CONFIG_TH_CXD2837)
-
-static struct resource cxd2837_resource[]  = {
-
-        [0] = {
-                .start = PAD_GPIOD_8,                           //frontend 0 reset pin
-                .end   = PAD_GPIOD_8,
-                .flags = IORESOURCE_MEM,
-                .name  = "frontend0_reset"
-        },
-        [1] = {
-                .start = 0,                                    //frontend  i2c adapter id
-                .end   = 0,
-                .flags = IORESOURCE_MEM,
-                .name  = "frontend0_i2c"
-        },
-        [2] = {
-                .start = 0xC0,                                 //frontend 0 tuner address
-                .end   = 0xC0,
-                .flags = IORESOURCE_MEM,
-                .name  = "frontend0_tuner_addr"
-        },
-        [3] = {
-                .start = 0xD8,                                 //frontend 0 demod address
-                .end   = 0xD8,
-                .flags = IORESOURCE_MEM,
-                .name  = "frontend0_demod_addr"
-        },
-
-};
-static  struct platform_device cxd2837_device = {
-        .name             = "cxd2837",
-        .id               = 0,
-        .num_resources    = ARRAY_SIZE(cxd2837_resource),
-        .resource         = cxd2837_resource,
-};
-#endif
-#ifdef CONFIG_AM_SI2168
-static struct resource si2168_resource[]  = {
-
-	[0] = {
-		.start = = IORESOURCE_MEM,
-		.name  = "frontend0_i2c"
-	},
-	[1] = {
-		.start = 0x38,                                 //frontend 0 demod address
-		.end   = 0x38,
-		.flags = IORESOURCE_MEM,
-		.name  = "frontend0_demod_addr"
-	},
-	[2] = {
-		.start = PAD_GPIOD_8, //reset pin
-		.end  = PAD_GPIOD_8,
-		.flags = IORESOURCE_MEM,
-		.name  = "frontend0_reset_pin"
-	},
-	[3] = {
-		.start = 0, //reset enable value
-		.end   = 0,
-		.flags = IORESOURCE_MEM,
-		.name  = "frontend0_reset_value_enable"
-	},
-	[4] = {
-		.start = 0xce,                                 
-		.end   = 0xce,
-		.flags = IORESOURCE_MEM,
-		.name  = "frontend0_tuner_addr"
-	},
-	[5] = {
-		.start = PAD_GPIOD_4,
-		.end   = PAD_GPIOD_4,
-		.flags = IORESOURCE_MEM,
-		.name  = "frontend0_POWERON/OFF"
-	},
-	[6] = {
-		.start = PAD_GPIOD_3,
-		.end   = PAD_GPIOD_3,
-		.flags = IORESOURCE_MEM,
-		.name  = "frontend0_ANTOVERLOAD"
-	},
-};
-
-static  struct platform_device si2168_device = {
-	.name             = "si2168",
-	.id               = -1,
-	.num_resources    = ARRAY_SIZE(si2168_resource),
-	.resource         = si2168_resource,
-};
-#endif//CONFIG_AM_SI2168
-#ifdef CONFIG_TH_MXL68X
-static struct resource mxl68x_resource[]  = {
-
-	[0] = {
-		.start = 0,                                    //frontend  i2c adapter id
-		.end   = 0,
-		.flags = IORESOURCE_MEM,
-		.name  = "frontend0_i2c"
-	},
-	[1] = {
-		.start = 0xC0,                                 //frontend 0 demod address
-		.end   = 0xC0,
-		.flags = IORESOURCE_MEM,
-		.name  = "frontend0_demod_addr"
-	},
-	[2] = {
-		.start = PAD_GPIOD_8, //reset pin
-		.end   = PAD_GPIOD_8,
-		.flags = IORESOURCE_MEM,
-		.name  = "frontend0_reset_pin"
-	},
-	[3] = {
-		.start = 0, //reset enable value
-		.end   = 0,
-		.flags = IORESOURCE_MEM,
-		.name  = "frontend0_reset_value_enable"
-	},
-	[5] = {
-		.start = 0xC0,                                 //is mxl101
-		.end   = 0xC0,
-		.flags = IORESOURCE_MEM,
-		.name  = "frontend0_tuner_addr"
-	},
-};
-
-
-static  struct platform_device mxl68x_device = {
-	.name             = "mxl68x",
-	.id               = -1,
-	.num_resources    = ARRAY_SIZE(mxl68x_resource),
-	.resource         = mxl68x_resource,
-};
-#endif//CONFIG_TH_MXL68X
-
-#if (defined CONFIG_AM_MN88436)
-static struct resource mn88436_resource[]  = {
-
-	[0] = {
-		.start = 0,                                 //i2c adapter id
-		.end   = 0,
-		.flags = IORESOURCE_MEM,
-		.name  = "frontend0_i2c"
-	},
-	[1] = {
-		.start = 0x60,                              //i2c address
-		.end   = 0x60,
-		.flags = IORESOURCE_MEM,
-		.name  = "frontend0_demod_addr"
-	},
-	[2] = {
-		.start = 0,                                 //reset value
-		.end   = 0,
-		.flags = IORESOURCE_MEM,
-		.name  = "frontend0_reset_value_enable"
-	},
-	[3] = {
-		.start = PAD_GPIOD_8, //reset pin
-		.end   = PAD_GPIOD_8,
-		.flags = IORESOURCE_MEM,
-		.name  = "frontend0_reset_pin"
-	},
-	[4] = {
-		.start = PAD_GPIOD_4,
-		.end   = PAD_GPIOD_4,
-		.flags = IORESOURCE_MEM,
-		.name  = "frontend_power"
-	},
-	[5] = {
-		.start = 0xce, // nmi120 tuner
-                .end   = 0xce,
-		.flags = IORESOURCE_MEM,
-		.name  = "frontend_tuner_addr"
-	},
-};
-static  struct platform_device mn88436_device = {
-        .name             = "mn88436",
-        .id               = -1,
-        .num_resources    = ARRAY_SIZE(mn88436_resource),
-        .resource         = mn88436_resource,
-};
-#endif
-
 #else //!CONFIG_AM_NEW_TV_ARCH
 
 static struct resource amlogic_dvb_fe_resource[]  = {
@@ -2754,7 +2216,13 @@ static struct resource amlogic_dvb_fe_resource[]  = {
 	[4] = {
 		.start = PAD_GPIOD_8, //reset pin
 		.end   = PAD_GPIOD_8,
-		.flags =ESOURCE_MEM,
+		.flags = IORESOURCE_MEM,
+		.name  = "dtv_demod0_reset_gpio"
+	},
+	[5] = {
+		.start = 0,
+		.end   = 0,
+		.flags = IORESOURCE_MEM,
 		.name  = "fe0_dtv_demod"
 	},
 	[6] = {
@@ -2844,10 +2312,8 @@ static struct resource amlogic_dvb_fe_resource[]  = {
 static  struct platform_device amlogic_dvb_fe_device = {
 	.name             = "amlogic-dvb-fe",
 	.id               = -1,
-#if !defined (CONFIG_AMLOGIC_DYNAMIC_FRONTEND_CONFIG)	
 	.num_resources    = ARRAY_SIZE(amlogic_dvb_fe_resource),
 	.resource         = amlogic_dvb_fe_resource,
-#endif	
 };
 #endif
 
@@ -2957,7 +2423,15 @@ static struct resource deinterlace_resources[] = {
     [0] = {
         .start =  DI_ADDR_START,
         .end   = DI_ADDR_END,
-        ce      = deinterlace_resources,
+        .flags = IORESOURCE_MEM,
+    },
+};
+
+static struct platform_device deinterlace_device = {
+    .name       = "deinterlace",
+    .id         = 0,
+    .num_resources = ARRAY_SIZE(deinterlace_resources),
+    .resource      = deinterlace_resources,
 };
 #endif
 
@@ -3062,9 +2536,6 @@ static struct platform_device  *platform_devs[] = {
 #if defined(CONFIG_MMC_AML)
     &aml_mmc_device,
 #endif
-#if defined(CONFIG_VFD_ENABLE) || defined(CONFIG_VFD_ENABLE_MODULE)
-        &vfd_device,
-#endif
 #if defined(CONFIG_SUSPEND)
     &aml_pm_device,
 #endif
@@ -3073,9 +2544,6 @@ static struct platform_device  *platform_devs[] = {
 #endif
 #if defined(CONFIG_AML_RTC)
     &aml_rtc_device,
-#endif
-#ifdef CONFIG_MESON_TRUSTZONE
-	&aml_secure_monitor_device,
 #endif
     &aml_audio,
     &aml_audio_dai,
@@ -3111,33 +2579,17 @@ static struct platform_device  *platform_devs[] = {
 #ifdef CONFIG_AM_MXL101	
 	&mxl101_device,
 #endif
-#ifdef CONFIG_TH_MXL68X
-	&mxl68x_device,
-#endif
 #ifdef CONFIG_AM_AVL6211
 	&avl6211_device,
 #endif
-
-#ifdef CONFIG_TH_A8304
-        &a8304_device,
-#endif
-
 #ifdef CONFIG_AM_ITE9173
 	&ite9173_device,
 #endif
 #ifdef CONFIG_AM_LGS9XB1
 	&lgs9xb1_device,
 #endif
-#ifdef CONFIG_TH_SONY_T2
-        &cxd2834_device,
-#endif
 #ifdef CONFIG_AM_DIB7090P
 	&dib7090p_device,
-#endif
-#ifdef CONFIG_AM_D_device,
-#endif   
-#ifdef CONFIG_TH_CXD2837
-    &cxd2837_device,
 #endif
 #endif
 #endif
@@ -3156,11 +2608,8 @@ static struct platform_device  *platform_devs[] = {
 #ifdef CONFIG_CPU_FREQ
 	&meson_cpufreq_device,
 #endif
-#if defined(CONFIG_AML_EMMC_KEY) || defined(CONFIG_AML_NAND_KEY)
+#if defined(CONFIG_AML_CARD_KEY) || defined(CONFIG_AML_NAND_KEY)
 	&aml_keys_device,
-#endif
-#ifdef CONFIG_AML_VIDEO_RES_MGR
-	&resmgr_device,
 #endif
 };
 
@@ -3173,12 +2622,9 @@ static __init void meson_init_machine(void)
      *  Do *NOT* merge for other BSP
      */
     aml_set_reg32_bits(AOBUS_REG_ADDR(0x24), 0,  3, 1);
-    aml_set_reg32_bits(AOBUS_REG_ADDR(0x24), 1, 19, 1);
+    aml_set_reg32_bits(AOBUS_REG_ADDR(0x24), 0, 19, 1);
     aml_set_reg32_bits(AOBUS_REG_ADDR(0x24), 0,  2, 1);
     aml_set_reg32_bits(AOBUS_REG_ADDR(0x24), 1, 18, 1);
-#ifdef CONFIG_RTL8189_SDIO_WIFI
-    extern_wifi_power(0);
-#endif
 #ifdef CONFIG_MESON_CS_DCDC_REGULATOR
     vcck_pwm_init();
 #endif
@@ -3205,17 +2651,15 @@ static __init void meson_init_machine(void)
     console_suspend_enabled = 0;
     }
 #endif
-#ifdef CONFIG_RTL8189_SDIO_WIFI
-    extern_wifi_power(1);
-#endif
-//	set_sata_power(1);     // disable sata by default,please enable it by project
+
+	set_sata_power(1);
 }
 static __init void meson_init_early(void)
 {///boot seq 1
 
 }
 
-MACHINE_START(MESON6_G02, "Amlogic Meson6 g02 customer platform")
+MACHINE_START(MESON6_G18, "Amlogic Meson6 g18 MX2 platform")
     .boot_params    = BOOT_PARAMS_OFFSET,
     .map_io         = meson_map_io,///2
     .init_early     = meson_init_early,///3
@@ -3224,4 +2668,3 @@ MACHINE_START(MESON6_G02, "Amlogic Meson6 g02 customer platform")
     .init_machine   = meson_init_machine,
     .fixup          = meson_fixup,///1
 MACHINE_END
-
