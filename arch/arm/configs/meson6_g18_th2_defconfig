@@ -753,9 +753,9 @@ CONFIG_USB_HOST_ELECT_TEST=y
 #
 # Amlogic Card support
 #
-CONFIG_CARDREADER=y
-CONFIG_SD_MMC=y
-CONFIG_SDIO=y
+# CONFIG_CARDREADER is not set
+# CONFIG_SD_MMC is not set
+# CONFIG_SDIO is not
 # CONFIG_AM_ATA is not set
 # CONFIG_MS_MSPRO is not set
 # CONFIG_XD is not set
