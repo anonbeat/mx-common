@@ -590,18 +590,18 @@ static struct mtd_partition normal_partition_info[] = {
     },
     {
         .name = "system",
-        .offset = 128*SZ_1M+40*SZ_1M,
-        .size = 512*SZ_1M+512*SZ_1M,
+        .offset = 128*SZ_1M+40*SZ_1M+4*SZ_1M,
+        .size = 512*SZ_1M+512*SZ_1M+4*SZ_1M,
     },
     {
         .name = "cache",
-        .offset = 640*SZ_1M+512*SZ_1M+40*SZ_1M,
+        .offset = 640*SZ_1M+512*SZ_1M+40*SZ_1M+4*SZ_1M,
         .size = 512*SZ_1M,
     },
 #if 1    
     {
     	  .name = "backup",
-        .offset = 1152*SZ_1M+512*SZ_1M+40*SZ_1M,
+        .offset = 1152*SZ_1M+512*SZ_1M+40*SZ_1M+4*SZ_1M,
         .size = 256*SZ_1M,
     },	
     {
